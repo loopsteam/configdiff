@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>条件配置对比工具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #050505;
+    --panel: rgba(11, 11, 11, 0.95);
+    --panel-border: rgba(255, 255, 255, 0.06);
+    --panel-soft: rgba(255, 255, 255, 0.03);
+    --text: #fdfdfd;
+    --muted: rgba(255, 255, 255, 0.55);
+    --accent: #ffffff;
+    --error: #ff8f8f;
+    --shadow: 0 30px 90px rgba(0, 0, 0, 0.75);
+  }
+
+  @font-face {
+    font-family: "Qiushui Shotai";
+    src: url("./Fonts/QiushuiShotai.woff2") format("woff2"),
+         url("./Fonts/QiushuiShotai.woff") format("woff");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Qiushui Shotai", serif;
+    color: var(--text);
+    background:
+      linear-gradient(125deg, #040404 0%, #050505 45%, #0a0a0a 100%),
+      radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.08), transparent 45%);
+    background-blend-mode: screen;
+    display: flex;
+    justify-content: center;
+    padding: clamp(24px, 5vw, 70px);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 70% 10%, rgba(255, 255, 255, 0.08), transparent 50%);
+    filter: blur(60px);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    width: min(1280px, 100%);
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: clamp(26px, 5vw, 56px);
+    background: linear-gradient(160deg, rgba(8, 8, 8, 0.95), rgba(18, 18, 18, 0.9));
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.4em;
+    color: var(--muted);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(34px, 5vw, 58px);
+    letter-spacing: 0.1em;
+  }
+
+  .subtitle {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  .subtitle span {
+    display: block;
+    font-size: 13px;
+    opacity: 0.8;
+  }
+
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .stat-card {
+    border-radius: 999px;
+    padding: 10px 22px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-delta {
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .stat-delta[data-trend="up"] { color: #7bffbd; }
+  .stat-delta[data-trend="down"] { color: #ff8f8f; }
+  .stat-delta[data-trend="flat"] { color: var(--muted); }
+
+  .panel {
+    border-radius: 28px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow);
+  }
+
+  .result-card {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .result-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .result-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .result-meta {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .diff-body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .diff-summary {
+    border-radius: 20px;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 16px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .diff-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .diff-section h3 {
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .diff-block {
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(9, 9, 9, 0.96);
+    padding: 18px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .diff-block[data-state="added"] {
+    border-color: rgba(134, 239, 172, 0.6);
+    box-shadow: 0 0 40px rgba(134, 239, 172, 0.3);
+    background: rgba(18, 32, 24, 0.95);
+  }
+
+  .diff-block[data-state="deleted"] {
+    border-color: rgba(248, 113, 113, 0.65);
+    box-shadow: 0 0 40px rgba(248, 113, 113, 0.3);
+    background: rgba(40, 18, 18, 0.95);
+  }
+
+  .diff-block[data-state="modified"] {
+    border-color: rgba(250, 204, 21, 0.65);
+    box-shadow: 0 0 40px rgba(250, 204, 21, 0.28);
+    background: rgba(45, 35, 10, 0.9);
+  }
+
+  .diff-block header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .tag { font-weight: 600; }
+  .tag-add { color: #7bffbd; }
+  .tag-del { color: #ff8f8f; }
+  .tag-mod { color: #facc15; }
+  .tag-unchanged { color: var(--muted); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-title {
+    font-size: 15px;
+    letter-spacing: 0.05em;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 240px;
+    resize: none;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 8, 8, 0.92);
+    color: var(--text);
+    padding: 18px 22px;
+    font-family: "Qiushui Shotai", serif;
+    font-size: 14px;
+    line-height: 1.6;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    overflow-y: hidden;
+  }
+
+  textarea:focus {
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+    background: rgba(12, 12, 12, 0.98);
+  }
+
+  .action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 0 6px;
+  }
+
+  .action-hint {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .btn {
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #111;
+    border-color: transparent;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .btn:hover:not([disabled]) {
+    transform: translateY(-1px);
+    box-shadow: 0 22px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.4);
+    outline-offset: 2px;
+  }
+
+  .btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .error {
+    margin: 0;
+    border-radius: 20px;
+    padding: 14px 18px;
+    border: 1px solid rgba(255, 143, 143, 0.4);
+    background: rgba(255, 143, 143, 0.1);
+    color: var(--error);
+  }
+
+  .error[hidden] { display: none; }
+
+  pre {
+    margin: 0;
+    font-family: "Qiushui Shotai", serif;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .muted { color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .result-controls {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .action-bar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+<section class="hero">
+    <p class="eyebrow">CONFIG DIFF</p>
+    <h1>配置对比</h1>
+    <p class="subtitle">
+      轻触比对，变更即现
+      <span>Touch to diff, changes surface.</span>
+    </p>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <span class="stat-label">修改前</span>
+        <span class="stat-value" id="statBefore">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">修改后</span>
+        <span class="stat-value" id="statAfter">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">变化</span>
+        <span class="stat-delta" id="statDelta" data-trend="flat">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">变更合计</span>
+        <span class="stat-value" id="statChanged">0</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultSection" class="panel result-card" hidden>
+    <div class="result-header">
+      <div>
+        <p class="eyebrow">DIFF OUTPUT</p>
+        <h2>对比结果</h2>
+      </div>
+      <div class="result-controls">
+        <span class="result-meta" id="resultMeta">尚未对比</span>
+        <button class="btn" id="copyBtn" type="button" disabled>复制结果</button>
+      </div>
+    </div>
+    <div class="diff-body" id="result" role="region" aria-live="polite"></div>
+  </section>
+
+  <section class="grid">
+    <article class="panel card">
+      <header>
+        <span class="card-title">修改前</span>
+      </header>
+      <textarea id="beforeInput" placeholder='{"conditions":[{"conditionSet":[{...}]}]}' spellcheck="false" aria-label="修改前 JSON"></textarea>
+    </article>
+    <article class="panel card">
+      <header>
+        <span class="card-title">修改后</span>
+      </header>
+      <textarea id="afterInput" placeholder='{"conditions":[{"conditionSet":[{...}]},{"conditionSet":[{...}]}]}' spellcheck="false" aria-label="修改后 JSON"></textarea>
+    </article>
+  </section>
+
+  <div class="action-bar">
+    <span class="action-hint">点击对比，结果浮出。</span>
+    <div class="action-buttons">
+      <button class="btn" id="fillDemoBtn" type="button">示例</button>
+      <button class="btn" id="clearBtn" type="button">清空</button>
+      <button class="btn btn-primary" id="compareBtn" type="button">对比</button>
+    </div>
+  </div>
+
+  <p id="errorBox" class="error" role="alert" hidden></p>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const beforeInput = $("beforeInput");
+  const afterInput = $("afterInput");
+  const compareBtn = $("compareBtn");
+  const fillDemoBtn = $("fillDemoBtn");
+  const clearBtn = $("clearBtn");
+  const copyBtn = $("copyBtn");
+  const errorBox = $("errorBox");
+  const resultSection = $("resultSection");
+  const resultEl = $("result");
+  const resultMeta = $("resultMeta");
+  const statBefore = $("statBefore");
+  const statAfter = $("statAfter");
+  const statDelta = $("statDelta");
+  const statChanged = $("statChanged");
+
+  const emptyStats = { before: 0, after: 0, added: 0, deleted: 0, modified: 0, unchanged: 0 };
+
+  const tagMeta = {
+    added: { label: "新增", className: "tag-add" },
+    deleted: { label: "删除", className: "tag-del" },
+    modified: { label: "修改", className: "tag-mod" },
+    unchanged: { label: "未变", className: "tag-unchanged" }
+  };
+
+  const demoBefore = `{
+  "conditions": [
+    {
+      "conditionSet": [
+        {
+          "type": "QueryAndListen",
+          "conditionType": "ItemCount",
+          "conditionParamsString": "item_id,int32,1040050196|Type:|compare_type,ENUM,4|Type:|num,int32,1|Type:|",
+          "conditionStruct": "None",
+          "paramDataMap": {}
+        }
+      ]
+    }
+  ]
+}`;
+
+  const demoAfter = `{
+  "conditions": [
+    {
+      "conditionSet": [
+        {
+          "type": "QueryAndListen",
+          "conditionType": "ItemCount",
+          "conditionParamsString": "item_id,int32,1040050196|Type:|compare_type,ENUM,4|Type:|num,int32,1|Type:|",
+          "conditionStruct": "None",
+          "paramDataMap": {}
+        }
+      ]
+    },
+    {
+      "conditionSet": [
+        {
+          "type": "QueryAndListen",
+          "conditionType": "ContainsQuestFlag",
+          "conditionParamsString": "QuestFlag,FString,EV_1022103_F1|Type:|",
+          "conditionStruct": "None",
+          "paramDataMap": {}
+        },
+        {
+          "type": "QueryAndListen",
+          "conditionType": "MagicboxgameFound",
+          "conditionParamsString": "GroupId,int32,2|Type:|GameId,int32,0|Type:|",
+          "conditionStruct": "None",
+          "paramDataMap": {}
+        }
+      ]
+    }
+  ]
+}`;
+
+  const syncHeights = () => {
+    window.requestAnimationFrame(() => {
+      [beforeInput, afterInput].forEach((area) => {
+        area.style.height = "auto";
+        const height = Math.max(240, area.scrollHeight);
+        area.style.height = `${height}px`;
+      });
+    });
+  };
+
+  const formatTime = (date) => date.toLocaleTimeString("zh-CN", { hour12: false });
+
+  const setMeta = (message) => {
+    resultMeta.textContent = message;
+  };
+
+  const resetResultView = (message = "尚未对比") => {
+    resultSection.hidden = true;
+    resultEl.innerHTML = "";
+    resultEl.dataset.state = "empty";
+    copyBtn.disabled = true;
+    setMeta(message);
+  };
+
+  const showError = (message) => {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  };
+
+  const hideError = () => {
+    errorBox.hidden = true;
+    errorBox.textContent = "";
+  };
+
+  const toArray = (value) => (Array.isArray(value) ? value : []);
+
+  const parseParams = (paramStr) => {
+    const map = {};
+    if (typeof paramStr !== "string" || !paramStr.trim()) return map;
+    const parts = paramStr.split("|Type:|").map((seg) => seg.trim()).filter(Boolean);
+    for (const segment of parts) {
+      const [name, , value] = segment.split(",").map((s) => s.trim());
+      if (name && value !== undefined) {
+        map[name] = value;
+      }
+    }
+    return map;
+  };
+
+  const summarizeCondition = (condition) => {
+    if (!condition || typeof condition !== "object") return "  - (无效条件)";
+    const kind = condition.type ? ` [${condition.type}]` : "";
+    const ctype = condition.conditionType || "<Unknown>";
+    const params = parseParams(condition.conditionParamsString);
+    const paramDesc = Object.keys(params).length
+      ? Object.entries(params).map(([key, value]) => `${key}=${value}`).join(", ")
+      : "(无参数)";
+    return `  - ${ctype}${kind} | ${paramDesc}`;
+  };
+
+  const summarizeGroup = (group) => {
+    const conds = Array.isArray(group?.conditionSet) ? group.conditionSet : [];
+    if (!conds.length) return "  (空的 conditionSet)";
+    return conds.map(summarizeCondition).join("\n");
+  };
+
+  const escapeHtml = (str) =>
+    String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  const groupsEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  const evaluateStatuses = (beforeConds, afterConds) => {
+    const maxLen = Math.max(beforeConds.length, afterConds.length);
+    const beforeStatus = new Array(beforeConds.length);
+    const afterStatus = new Array(afterConds.length);
+    const stats = { before: beforeConds.length, after: afterConds.length, added: 0, deleted: 0, modified: 0, unchanged: 0 };
+
+    for (let i = 0; i < maxLen; i++) {
+      const b = beforeConds[i];
+      const a = afterConds[i];
+      if (b && !a) {
+        beforeStatus[i] = "deleted";
+        stats.deleted++;
+      } else if (!b && a) {
+        afterStatus[i] = "added";
+        stats.added++;
+      } else if (b && a) {
+        if (groupsEqual(b, a)) {
+          beforeStatus[i] = "unchanged";
+          afterStatus[i] = "unchanged";
+          stats.unchanged++;
+        } else {
+          beforeStatus[i] = "modified";
+          afterStatus[i] = "modified";
+          stats.modified++;
+        }
+      }
+    }
+
+    return { beforeStatus, afterStatus, stats };
+  };
+
+  const renderSection = (title, conds, statuses) => {
+    if (!conds.length) {
+      return `<section class="diff-section"><h3>${title}</h3><p class="muted">（无数据）</p></section>`;
+    }
+    const items = conds.map((group, index) => {
+      const state = statuses[index] || "unchanged";
+      const meta = tagMeta[state] || tagMeta.unchanged;
+      const summary = escapeHtml(summarizeGroup(group));
+      return `
+        <article class="diff-block" data-state="${state}">
+          <header>
+            <span class="tag ${meta.className}">[${meta.label}]</span>
+            <span class="muted">条件组 #${index + 1}</span>
+          </header>
+          <pre>${summary}</pre>
+        </article>
+      `;
+    }).join("");
+    return `<section class="diff-section"><h3>${title}</h3>${items}</section>`;
+  };
+
+  const buildDiff = (beforeObj, afterObj) => {
+    const beforeConds = toArray(beforeObj.conditions);
+    const afterConds = toArray(afterObj.conditions);
+    const { beforeStatus, afterStatus, stats } = evaluateStatuses(beforeConds, afterConds);
+    const summary = `
+      <div class="diff-summary">
+        <span>条件组数量：${stats.before} → ${stats.after}</span>
+        <span>新增 ${stats.added} · 删除 ${stats.deleted} · 修改 ${stats.modified}</span>
+      </div>
+    `;
+    const html = summary
+      + renderSection("修改前", beforeConds, beforeStatus)
+      + renderSection("修改后", afterConds, afterStatus);
+    return { html, stats };
+  };
+
+  const updateStats = (stats) => {
+    statBefore.textContent = stats.before;
+    statAfter.textContent = stats.after;
+    const delta = stats.after - stats.before;
+    statDelta.dataset.trend = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
+    statDelta.textContent = delta > 0 ? `+${delta}` : `${delta}`;
+    statChanged.textContent = stats.added + stats.deleted + stats.modified;
+  };
+
+  const resetStats = () => {
+    updateStats(emptyStats);
+  };
+
+  const parseJsonField = (field, label) => {
+    const raw = field.value.trim();
+    if (!raw) {
+      throw new Error(`请先输入${label} JSON`);
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      field.value = JSON.stringify(parsed, null, 2);
+      return parsed;
+    } catch (error) {
+      throw new Error(`${label} JSON 解析失败：${error.message}`);
+    }
+  };
+
+  const handleCompare = () => {
+    try {
+      hideError();
+      const beforeObj = parseJsonField(beforeInput, "修改前");
+      const afterObj = parseJsonField(afterInput, "修改后");
+      syncHeights();
+      const { html, stats } = buildDiff(beforeObj, afterObj);
+      resultSection.hidden = false;
+      copyBtn.disabled = false;
+      resultEl.innerHTML = html;
+      resultEl.dataset.state = "ready";
+      updateStats(stats);
+      setMeta(`对比完成 · ${formatTime(new Date())}`);
+    } catch (error) {
+      showError(error.message);
+    }
+  };
+
+  const handleFillDemo = () => {
+    beforeInput.value = demoBefore;
+    afterInput.value = demoAfter;
+    hideError();
+    resetStats();
+    resetResultView("已填充示例数据，点击开始对比");
+    syncHeights();
+  };
+
+  const handleClear = () => {
+    beforeInput.value = "";
+    afterInput.value = "";
+    hideError();
+    resetStats();
+    resetResultView("尚未对比");
+    syncHeights();
+  };
+
+  const fallbackCopy = (text) => {
+    const helper = document.createElement("textarea");
+    helper.value = text;
+    helper.setAttribute("readonly", "readonly");
+    helper.style.position = "absolute";
+    helper.style.left = "-9999px";
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    document.body.removeChild(helper);
+  };
+
+  const handleCopy = async () => {
+    const plain = resultEl.innerText.trim();
+    if (!plain || resultEl.dataset.state === "empty" || resultSection.hidden || copyBtn.disabled) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(plain);
+      } else {
+        fallbackCopy(plain);
+      }
+      const staleNotice = resultEl.dataset.state === "stale" ? "（最新输入待对比）" : "";
+      setMeta(`结果已复制${staleNotice} · ${formatTime(new Date())}`);
+      hideError();
+    } catch {
+      fallbackCopy(plain);
+      setMeta("结果已复制（兼容模式）");
+    }
+  };
+
+  [beforeInput, afterInput].forEach((area) => {
+    area.addEventListener("input", () => {
+      hideError();
+      if (!resultSection.hidden && resultEl.dataset.state === "ready") {
+        resultEl.dataset.state = "stale";
+        copyBtn.disabled = true;
+        setMeta("输入已更新，点击开始对比");
+      }
+      syncHeights();
+    });
+  });
+
+  window.addEventListener("resize", () => syncHeights());
+
+  compareBtn.addEventListener("click", handleCompare);
+  fillDemoBtn.addEventListener("click", handleFillDemo);
+  clearBtn.addEventListener("click", handleClear);
+  copyBtn.addEventListener("click", handleCopy);
+
+  resetStats();
+  resetResultView();
+  syncHeights();
+})();
+</script>
+</body>
+</html>
